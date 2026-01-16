@@ -24,6 +24,14 @@ class VideoRenderer:
             text = str(text)
         
         # 1. Load Font
+        fontsize = int(fontsize) # Ensure int
+        stroke_width = int(stroke_width)
+        
+        print(f"DEBUG: Loading font '{font_path}' size={fontsize}")
+        
+        if not os.path.exists(font_path):
+            print(f"WARNING: Font file not found at {font_path}. Using default.")
+        
         try:
             font = ImageFont.truetype(font_path, fontsize)
         except Exception as e:
@@ -31,7 +39,12 @@ class VideoRenderer:
             # Fallback to default load if specific path fails
             try:
                 font = ImageFont.load_default()
-                print("Using default PIL font.")
+                print("Using default PIL font (fallback).")
+                # Attempt to set size for default font if possible (Pillow 10+)
+                try:
+                    font = ImageFont.load_default(size=fontsize)
+                except:
+                    pass
             except:
                 raise Exception("Could not load any font.")
 
