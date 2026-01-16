@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 from typing import List, Dict, Any, Optional, Tuple, Union
+import streamlit as st
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, ColorClip
 from settings import (
     STYLE_BOLD_REEL, STYLE_MINIMALIST, STYLE_DYNAMIC_POP,
@@ -93,14 +94,17 @@ class VideoRenderer:
                 if size:
                     kwargs['size'] = size
                     
-                return TextClip(text, **kwargs)
+                clip = TextClip(text, **kwargs)
+                print(f"SUCCESS: Created TextClip with font: {f}")
+                return clip
                 
             except Exception as e:
-                # print(f"Failed to create TextClip with font '{f}': {e}") # Reduce noise
+                print(f"DEBUG: Failed to create TextClip with font '{f}': {e}")
                 last_exception = e
                 continue
         
         # If all fail, raise the last exception or a generic one
+        print("CRITICAL: All font attempts failed.")
         raise last_exception or Exception("Could not create TextClip with any available font.")
 
     def render_video(self, video_path: str, subtitles: List[Dict[str, Any]], style: str, output_path: str, style_config: Optional[Dict[str, Any]] = None) -> str:

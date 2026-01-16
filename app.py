@@ -143,7 +143,22 @@ def main():
 
     # --- Sidebar ---
     with st.sidebar:
-        st.header("Settings")
+        st.header("⚙️ Configuration")
+        
+        # --- DEBUG SECTION ---
+        with st.expander("🛠️ System Debugger"):
+            st.write(f"**CWD:** `{os.getcwd()}`")
+            st.write("**Font Directory Check:**")
+            if os.path.exists(FONTS_DIR):
+                files = os.listdir(FONTS_DIR)
+                st.write(files)
+            else:
+                st.error("Fonts dir missing!")
+            
+            st.write("**ImageMagick Binary:**")
+            st.code(os.environ.get("IMAGEMAGICK_BINARY", "Not Set"))
+        # ---------------------
+
         st.write("Device: Apple Silicon (M1/M2)")
         if st.button("🧹 Purge Temp Files"):
             cleanup_temp_files()
