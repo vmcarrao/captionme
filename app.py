@@ -3,7 +3,7 @@ import os
 import shutil
 from utils import download_google_fonts
 from settings import (
-    TEMP_DIR, OUTPUT_DIR, STYLES, STYLE_BOLD_REEL, STYLE_MINIMALIST, STYLE_DYNAMIC_POP,
+    TEMP_DIR, OUTPUT_DIR, FONTS_DIR, STYLES, STYLE_BOLD_REEL, STYLE_MINIMALIST, STYLE_DYNAMIC_POP,
     FONT_BOLD, FONT_MINIMAL, FONT_IMPACT, WHISPER_MODEL_SIZE
 )
 from drive_service import DriveService
