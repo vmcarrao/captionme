@@ -9,6 +9,8 @@ def authenticate_google_drive():
     """Authenticates the user and returns the Drive service credentials."""
     import streamlit as st
     
+    creds = None
+    
     # 1. Check Streamlit Secrets (Cloud / Deployment)
     # 1. Check Streamlit Secrets (Cloud / Deployment)
     try:
