@@ -114,11 +114,17 @@ class VideoRenderer:
             # Ensure it's a string
             text_content = str(text_content)
 
-            txt_clip = (TextClip(text_content, fontsize=fontsize, font=font, color=color, stroke_color=stroke_color, stroke_width=stroke_width, method='caption', size=(w*0.8, None))
-                        .set_position(('center', 0.7*h)) # Bottom-center
-                        .set_start(sub['start'])
-                        .set_end(sub['end']))
-            clips.append(txt_clip)
+            try:
+                txt_clip = (self._create_text_clip_safe(text_content, fontsize=fontsize, font=font, color=color, 
+                                                      stroke_color=stroke_color, stroke_width=stroke_width, 
+                                                      method='caption', size=(w*0.8, None))
+                            .set_position(('center', 0.7*h)) # Bottom-center
+                            .set_start(sub['start'])
+                            .set_end(sub['end']))
+                clips.append(txt_clip)
+            except Exception as e:
+                print(f"Skipping subtitle '{text_content[:15]}...' due to render error: {e}")
+                continue
         return clips
 
     def _create_minimalist_clips(self, subtitles: List[Dict[str, Any]], video_size: Tuple[int, int], config: Optional[Dict[str, Any]] = None) -> List[Any]:
@@ -139,8 +145,13 @@ class VideoRenderer:
         for sub in subtitles:
             text_content = str(sub.get('text', '') or "")
             # Create text first to measure it (approximation) or fixed size
-            txt_clip = (TextClip(text_content, fontsize=fontsize, font=font, color=color, method='caption', size=(w*0.8, None))
-                        .set_position('center'))
+            try:
+                txt_clip = (self._create_text_clip_safe(text_content, fontsize=fontsize, font=font, color=color, 
+                                                      method='caption', size=(w*0.8, None))
+                            .set_position('center'))
+            except Exception as e:
+                print(f"Skipping subtitle due to render error: {e}")
+                continue
             
             # Create a semi-transparent black box behind it
             # Note: TextClip size isn't always perfect for backgrounds without more complex logic, 
@@ -186,11 +197,18 @@ class VideoRenderer:
             if not words:
                 text_content = str(sub.get('text', '') or "")
                 # Fallback if no word-level timestamps
-                txt_clip = (TextClip(text_content, fontsize=fontsize*0.8, font=font, color=color, stroke_color=stroke_color, stroke_width=stroke_width, method='caption', size=(w*0.9, None))
-                        .set_position('center')
-                        .set_start(sub['start'])
-                        .set_end(sub['end']))
-                clips.append(txt_clip)
+                # Fallback if no word-level timestamps
+                try:
+                    txt_clip = (self._create_text_clip_safe(text_content, fontsize=fontsize*0.8, font=font, color=color, 
+                                                          stroke_color=stroke_color, stroke_width=stroke_width, 
+                                                          method='caption', size=(w*0.9, None))
+                            .set_position('center')
+                            .set_start(sub['start'])
+                            .set_end(sub['end']))
+                    clips.append(txt_clip)
+                except Exception as e:
+                    print(f"Skipping subtitle due to render error: {e}")
+                continue
                 continue
 
             for word_info in words:
@@ -200,11 +218,16 @@ class VideoRenderer:
                 end = word_info['end']
                 
                 # Make it pop! Huge font, center screen
-                txt_clip = (TextClip(word_text, fontsize=fontsize, font=font, color=color, stroke_color=stroke_color, stroke_width=stroke_width)
-                            .set_position('center')
-                            .set_start(start)
-                            .set_end(end))
-                clips.append(txt_clip)
+                try:
+                    txt_clip = (self._create_text_clip_safe(word_text, fontsize=fontsize, font=font, color=color, 
+                                                          stroke_color=stroke_color, stroke_width=stroke_width)
+                                .set_position('center')
+                                .set_start(start)
+                                .set_end(end))
+                    clips.append(txt_clip)
+                except Exception as e:
+                    print(f"Skipping word '{word_text}' due to render error: {e}")
+                    continue
                 
         return clips
 
