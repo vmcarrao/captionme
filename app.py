@@ -434,6 +434,18 @@ def main():
                                     file_name=output_filename,
                                     mime="video/mp4"
                                 )
+    else:
+        st.error("⚠️ Google Drive Integration Failed")
+        st.warning("""
+        **Authentication Credentials Not Found**
+        
+        To run this app on Streamlit Cloud, you must configure secrets:
+        1. Go to your App Dashboard > **Settings** > **Secrets**.
+        2. Create a section `[google_drive]`.
+        3. Add your `token`, `client_id`, `client_secret`, etc.
+        
+        *If running locally, ensure `credentials.json` is in the root directory.*
+        """)
 
 if __name__ == "__main__":
     main()
