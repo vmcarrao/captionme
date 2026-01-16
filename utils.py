@@ -3,6 +3,7 @@ import requests
 import streamlit as st
 from settings import FONTS_DIR
 
+
 def download_file(url, save_path):
     """Downloads a file from a URL to a specific path."""
     try:
@@ -11,9 +12,18 @@ def download_file(url, save_path):
         with open(save_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
+        
+        # Integrity Check
+        if os.path.getsize(save_path) < 1000: # 1KB minimum
+            print(f"Warning: File {save_path} is too small. Deleting.")
+            os.remove(save_path)
+            return False
+            
         return True
     except Exception as e:
         print(f"Error downloading {url}: {e}")
+        if os.path.exists(save_path):
+             os.remove(save_path)
         return False
 
 
