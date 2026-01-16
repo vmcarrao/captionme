@@ -35,37 +35,25 @@ class VideoRenderer:
             except:
                 raise Exception("Could not load any font.")
 
-        # 2. Measure Text
-        # draw.textbbox((0,0), text, font=font) -> (left, top, right, bottom)
-        dummy_img = Image.new('RGBA', (1, 1))
-        draw = ImageDraw.Draw(dummy_img)
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
+        # 3. Create Image (with ample padding for strokes/glows)
+        # Using anchor='mm' (middle-middle) to center text reliably
         
-        # Add padding for strokes
-        padding = int(stroke_width * 2) + 10
+        # Measure with stroke included (rough estimate, as bbox doesn't always strictly include stroke)
+        dummy_draw = ImageDraw.Draw(Image.new('RGBA', (1, 1)))
+        # Get standard bbox
+        bbox = dummy_draw.textbbox((0, 0), text, font=font, anchor='mm', stroke_width=stroke_width)
         
-        final_width = text_width + padding
-        final_height = text_height + padding
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
         
-        # If a specific size is requested (e.g. for flow), we might need to conform to it,
-        # but ImageClip handles positioning. Let's make the image just big enough for the text.
+        W = int(text_w + stroke_width * 2 + 20)
+        H = int(text_h + stroke_width * 2 + 20)
         
-        # 3. Create Image
-        img = Image.new('RGBA', (final_width, final_height), (0, 0, 0, 0))
+        img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         
-        # 4. Draw stroke (if any)
-        # PIL doesn't have native stroke for text in older versions, but 'stroke_width' is supported in newer Pillow.
-        # stroke_fill = stroke_color
-        
-        # Center the text in the image
-        x = padding // 2
-        y = padding // 2
-
-        # Draw Text
-        draw.text((x, y), text, font=font, fill=color, stroke_width=stroke_width, stroke_fill=stroke_color)
+        # Draw centered
+        draw.text((W/2, H/2), text, font=font, fill=color, anchor='mm', stroke_width=stroke_width, stroke_fill=stroke_color)
         
         return np.array(img)
 
