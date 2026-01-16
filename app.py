@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import shutil
+from utils import download_google_fonts
 from settings import (
     TEMP_DIR, OUTPUT_DIR, STYLES, STYLE_BOLD_REEL, STYLE_MINIMALIST, STYLE_DYNAMIC_POP,
     FONT_BOLD, FONT_MINIMAL, FONT_IMPACT, WHISPER_MODEL_SIZE
@@ -30,6 +31,10 @@ def cleanup_temp_files():
 
 # --- Main App ---
 def main():
+    # --- Runtime Setup ---
+    # Ensure fonts are available (Download from Google if missing)
+    download_google_fonts()
+
     # --- Custom CSS (Brutalist Theme) ---
     st.markdown("""
         <style>
@@ -427,12 +432,17 @@ def main():
                         
                         # Download Link (Always available for current file)
                         if os.path.exists(output_path):
+                             
+                             # Instructions for User
+                             st.info("ℹ️ **Download Note**: Click the button below to save the video to your device's default download folder.")
+                             
                              with open(output_path, "rb") as f:
                                 st.download_button(
-                                    label="Download Current Video",
+                                    label="⬇️ DOWNLOAD VIDEO TO DEVICE",
                                     data=f,
                                     file_name=output_filename,
-                                    mime="video/mp4"
+                                    mime="video/mp4",
+                                    type="primary" 
                                 )
     else:
         st.error("⚠️ Google Drive Integration Failed")
