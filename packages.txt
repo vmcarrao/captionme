@@ -1,2 +1,5 @@
 ffmpeg
 imagemagick
+fonts-liberation
+fonts-dejavu
+fonts-freefont-ttf
