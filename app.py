@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import shutil
-from utils import download_google_fonts
+from utils import download_google_fonts, fetch_google_font
 from settings import (
     TEMP_DIR, OUTPUT_DIR, FONTS_DIR, STYLES, STYLE_BOLD_REEL, STYLE_MINIMALIST, STYLE_DYNAMIC_POP,
     FONT_BOLD, FONT_MINIMAL, FONT_IMPACT, WHISPER_MODEL_SIZE
@@ -382,8 +382,39 @@ def main():
                         with st.expander("✨ Customize Style (Font, Size, Color)"):
                             col1, col2 = st.columns(2)
                             with col1:
-                                available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT, "Arial", "Helvetica", "Times New Roman"]
-                                cust_font = st.selectbox("Font", available_fonts, index=0)
+                                available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT]
+                                font_mode = st.radio("Font Source", ["Presets", "Custom Google Font"], horizontal=True)
+                                
+                                final_font_path = FONT_BOLD # Default
+                                
+                                if font_mode == "Presets":
+                                    # Create readable labels for the paths
+                                    font_map = {
+                                        "Roboto Bold": FONT_BOLD,
+                                        "Roboto Regular": FONT_MINIMAL,
+                                        "Anton Impact": FONT_IMPACT
+                                    }
+                                    selected_label = st.selectbox("Choose Preset", list(font_map.keys()))
+                                    final_font_path = font_map[selected_label]
+                                else:
+                                    google_font_name = st.text_input("Enter Google Font Name (e.g. Lobster)", value="Lobster")
+                                    if st.button("Fetch Font"):
+                                        with st.spinner(f"Fetching {google_font_name}..."):
+                                            fetched_path = fetch_google_font(google_font_name)
+                                            if fetched_path:
+                                                st.success("Font downloaded!")
+                                                final_font_path = fetched_path
+                                                # Force reload to ensure next render uses it?
+                                                # Actually just setting the var is enough for the render button info
+                                                st.session_state.custom_font_path = fetched_path 
+                                            else:
+                                                st.error("Could not find font. Try checking the name on fonts.google.com")
+                                    
+                                    # Use cached custom path if available
+                                    if "custom_font_path" in st.session_state:
+                                        final_font_path = st.session_state.custom_font_path
+                                        st.caption(f"Using: {os.path.basename(final_font_path)}")
+
                                 cust_fontsize = st.number_input("Font Size", value=70, step=5)
                                 cust_stroke_width = st.number_input("Stroke Width", value=2, step=1)
                             with col2:
@@ -391,7 +422,7 @@ def main():
                                 cust_stroke_color = st.color_picker("Stroke/Outline Color", "#000000")
                             
                             style_config = {
-                                "font": cust_font,
+                                "font": final_font_path,
                                 "fontsize": cust_fontsize,
                                 "color": cust_color,
                                 "stroke_color": cust_stroke_color,

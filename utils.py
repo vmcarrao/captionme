@@ -16,9 +16,42 @@ def download_file(url, save_path):
         print(f"Error downloading {url}: {e}")
         return False
 
+
+def fetch_google_font(font_name: str) -> str:
+    """
+    Attempts to download a Google Font by name (e.g. "Lobster", "Open Sans").
+    Returns the local path to the .ttf file if successful, or None.
+    """
+    # Clean name
+    clean_name = font_name.strip()
+    file_name = f"{clean_name.replace(' ', '')}-Regular.ttf"
+    save_path = os.path.join(FONTS_DIR, file_name)
+    
+    if os.path.exists(save_path):
+        return save_path
+        
+    # Google Fonts GitHub structure isn't perfectly uniform, usually:
+    # ofl/fontname/FontName-Regular.ttf
+    # apache/fontname/FontName-Regular.ttf
+    # ufl/fontname/FontName-Regular.ttf
+    
+    os.makedirs(FONTS_DIR, exist_ok=True)
+    
+    base_urls = [
+        f"https://github.com/google/fonts/raw/main/ofl/{clean_name.lower().replace(' ', '')}/{file_name}",
+        f"https://github.com/google/fonts/raw/main/apache/{clean_name.lower().replace(' ', '')}/{file_name}",
+        f"https://github.com/google/fonts/raw/main/ufl/{clean_name.lower().replace(' ', '')}/{file_name}"
+    ]
+    
+    for url in base_urls:
+        if download_file(url, save_path):
+            return save_path
+            
+    return None
+
 def download_google_fonts():
     """
-    Downloads required Google Fonts if they don't exist locally.
+    Downloads required base Google Fonts if they don't exist locally.
     """
     # Define fonts to download (Raw GitHub URLs for Google Fonts)
     fonts = {
@@ -33,12 +66,11 @@ def download_google_fonts():
     for filename, url in fonts.items():
         file_path = os.path.join(FONTS_DIR, filename)
         if not os.path.exists(file_path):
-            # st.write(f"Downloading font: {filename}...") # Debug info usually not needed in UI unless slow
             print(f"Downloading font: {filename}...")
             if download_file(url, file_path):
                 created += 1
         else:
             pass
-            # print(f"Font already exists: {filename}")
             
     return created
+
