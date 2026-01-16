@@ -62,6 +62,47 @@ class VideoRenderer:
         pass
 
 
+    def _create_text_clip_safe(self, text, font, fontsize, color, stroke_color=None, stroke_width=0, method='caption', size=None):
+        """
+        Creates a TextClip with fallback to system fonts if the custom font fails.
+        """
+        if not isinstance(text, str):
+            text = str(text)
+            
+        # List of fallback fonts to try if the primary one fails
+        fonts_to_try = [font, 'DejaVu-Sans', 'FreeSans', 'Arial', 'Helvetica', 'label']
+        
+        last_exception = None
+        
+        for f in fonts_to_try:
+            try:
+                # Basic arguments
+                kwargs = {
+                    'fontsize': fontsize,
+                    'color': color,
+                    'font': f
+                }
+                
+                # Add optional args
+                if stroke_color:
+                    kwargs['stroke_color'] = stroke_color
+                if stroke_width:
+                    kwargs['stroke_width'] = stroke_width
+                if method:
+                    kwargs['method'] = method
+                if size:
+                    kwargs['size'] = size
+                    
+                return TextClip(text, **kwargs)
+                
+            except Exception as e:
+                # print(f"Failed to create TextClip with font '{f}': {e}") # Reduce noise
+                last_exception = e
+                continue
+        
+        # If all fail, raise the last exception or a generic one
+        raise last_exception or Exception("Could not create TextClip with any available font.")
+
     def render_video(self, video_path: str, subtitles: List[Dict[str, Any]], style: str, output_path: str, style_config: Optional[Dict[str, Any]] = None) -> str:
         """
         Renders the video with burned-in subtitles based on the selected style.
@@ -197,7 +238,6 @@ class VideoRenderer:
             if not words:
                 text_content = str(sub.get('text', '') or "")
                 # Fallback if no word-level timestamps
-                # Fallback if no word-level timestamps
                 try:
                     txt_clip = (self._create_text_clip_safe(text_content, fontsize=fontsize*0.8, font=font, color=color, 
                                                           stroke_color=stroke_color, stroke_width=stroke_width, 
@@ -208,7 +248,6 @@ class VideoRenderer:
                     clips.append(txt_clip)
                 except Exception as e:
                     print(f"Skipping subtitle due to render error: {e}")
-                continue
                 continue
 
             for word_info in words:
