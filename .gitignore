@@ -1,0 +1,22 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Google Credentials
+token.json
+credentials.json
+client_secret.json
+
+# App data
+temp_files/
+output/
+fonts/
