@@ -288,6 +288,7 @@ def main():
             
             current_filename = st.session_state.selected_batch[current_index]
             is_batch = total_files > 1
+            is_last_video = (current_index == total_files - 1)
             
             # Progress UI
             if is_batch:
@@ -501,7 +502,7 @@ def main():
                             
                             if is_batch:
                                 # Determine if Last Video
-                                is_last_video = (current_index == total_files - 1)
+                                # is_last_video defined above
                                 
                                 if not is_last_video:
                                     if st.button("Next Video ➡️", type="primary", use_container_width=True):
