@@ -4,6 +4,7 @@ import streamlit as st
 from settings import FONTS_DIR
 
 
+
 def download_file(url, save_path):
     """Downloads a file from a URL to a specific path."""
     try:
@@ -13,11 +14,35 @@ def download_file(url, save_path):
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
         
-        # Integrity Check
+        # Integrity Check 1: Size
         if os.path.getsize(save_path) < 1000: # 1KB minimum
             print(f"Warning: File {save_path} is too small. Deleting.")
             os.remove(save_path)
             return False
+
+        # Integrity Check 2: Magic Bytes (The "Is this actually a font?" check)
+        # Proper TTF files start with 00 01 00 00
+        # OpenType (OTTO) starts with 4F 54 54 4F
+        with open(save_path, 'rb') as f:
+            header = f.read(4)
+            
+        # Common TTF/OTF signatures
+        valid_headers = [
+            b'\x00\x01\x00\x00', # TrueType 1
+            b'OTTO',             # OpenType
+            b'true',             # TrueType (Mac)
+            b'typ1'              # Type 1
+        ]
+        
+        if header not in valid_headers:
+            # It might be a woff2 or something else, but we requested TTF.
+            # If it's HTML (starts with <!DO or <htm), it's definitely junk.
+            if header.startswith(b'<') or b'html' in header.lower():
+                print(f"Warning: File {save_path} appears to be HTML/XML, not a font. Deleting.")
+                os.remove(save_path)
+                return False
+            # We'll be lenient with other binary headers just in case, but warn.
+            print(f"Warning: Unknown file header {header} for {save_path}. Proceeding with caution.")
             
         return True
     except Exception as e:
