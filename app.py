@@ -437,15 +437,14 @@ def main():
 
                     output_filename = f"captioned_{st.session_state.selected_file['name']}"
                     output_path = os.path.join(OUTPUT_DIR, output_filename)
+                    is_rendered = os.path.exists(output_path)
                     
-                    # Actions
-                    col_b1, col_b2 = st.columns([1, 1])
+                    st.divider()
                     
-                    with col_b1:
-                        # Dynamic Button Label
-                        btn_label = "🔥 Render & Next Video ➡️" if is_batch else "🔥 Burn Captions"
-                        
-                        if st.button(btn_label, type="primary"):
+                    # --- ACTION AREA ---
+                    if not is_rendered:
+                        # STEP 1: RENDER
+                        if st.button("🔥 Render Video", type="primary", use_container_width=True):
                             with st.spinner("Rendering video (MoviePy)..."):
                                 renderer = VideoRenderer()
                                 final_path = renderer.render_video(
@@ -456,32 +455,73 @@ def main():
                                     style_config=style_config
                                 )
                             st.success(f"Rendering complete! Saved to {output_path}")
+                            st.rerun()
+                            
+                    else:
+                        # STEP 2: POST-RENDER ACTIONS (Save & Next)
+                        st.success(f"✅ Render Complete: {output_filename}")
+                        
+                        col_actions_1, col_actions_2 = st.columns(2)
+                        
+                        # LEFT COL: Save/Download Current
+                        with col_actions_1:
+                            st.markdown("#### 💾 Save Current Video")
+                            
+                            # 1. Browser Download
+                            with open(output_path, "rb") as f:
+                                st.download_button(
+                                    label="⬇️ Download (Browser)",
+                                    data=f,
+                                    file_name=output_filename,
+                                    mime="video/mp4"
+                                )
+                                
+                            # 2. Local Folder Move
+                            st.markdown("---")
+                            default_path = st.session_state.saved_local_path
+                            local_dest = st.text_input("Local Folder Path", value=default_path, placeholder="/Users/me/Movies")
+                            remember = st.checkbox("Remember path", value=True, key="remember_current")
+                            
+                            if st.button("📂 Move to Folder"):
+                                if local_dest and os.path.exists(local_dest):
+                                    try:
+                                        dst = os.path.join(local_dest, output_filename)
+                                        shutil.copy2(output_path, dst)
+                                        st.success(f"Saved to `{local_dest}`")
+                                        if remember:
+                                            st.session_state.saved_local_path = local_dest
+                                    except Exception as e:
+                                        st.error(f"Error: {e}")
+                                else:
+                                    st.error("Invalid folder.")
+
+                        # RIGHT COL: Navigation
+                        with col_actions_2:
+                            st.markdown("#### ⏩ Navigation")
                             
                             if is_batch:
-                                # Advance Queue
-                                st.session_state.batch_index += 1
-                                st.rerun()
+                                # Determine if Last Video
+                                is_last_video = (current_index == total_files - 1)
+                                
+                                if not is_last_video:
+                                    if st.button("Next Video ➡️", type="primary", use_container_width=True):
+                                        st.session_state.batch_index += 1
+                                        st.rerun()
+                                else:
+                                    st.info("This was the last video in the batch.")
+                                    # Option to Go to Summary (which has Download All)
+                                    if st.button("🏁 Finish & View Batch Results", type="primary", use_container_width=True):
+                                        st.session_state.batch_index += 1
+                                        st.rerun()
+                            else:
+                                st.info("Single file processed.")
 
-                    with col_b2:
-                        if is_batch:
-                             if st.button("Skip Video ⏭️"):
-                                 st.session_state.batch_index += 1
-                                 st.rerun()
-                    
-                    # Download Link (Always available for current file)
-                    if os.path.exists(output_path):
-                         
-                         # Instructions for User
-                         st.info("ℹ️ **Download Note**: Click the button below to save the video to your device's default download folder.")
-                         
-                         with open(output_path, "rb") as f:
-                            st.download_button(
-                                label="⬇️ DOWNLOAD VIDEO TO DEVICE",
-                                data=f,
-                                file_name=output_filename,
-                                mime="video/mp4",
-                                type="primary" 
-                            )
+                    # Skip Logic (Always available if not rendered or if user wants to skip despite render)
+                    if is_batch and not is_last_video: # Only show skip if not last
+                         st.markdown("---")
+                         if st.button("Skip Video ⏭️"):
+                             st.session_state.batch_index += 1
+                             st.rerun()
     else:
         st.info("👋 Welcome to CaptionME. Drag & drop video files above to begin.")
 
