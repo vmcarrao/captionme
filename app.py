@@ -193,6 +193,8 @@ def main():
         st.session_state.selected_batch = []
     if "batch_index" not in st.session_state:
         st.session_state.batch_index = 0
+    if "saved_local_path" not in st.session_state:
+        st.session_state.saved_local_path = ""
     
     if "processing_started" not in st.session_state:
         st.session_state.processing_started = False
@@ -240,9 +242,69 @@ def main():
             if current_index >= total_files:
                 st.success("🎉 All files in the batch have been processed!")
                 st.balloons()
-                if st.button("Start Over"):
+                
+                # --- BATCH COMPLETION UI ---
+                st.divider()
+                st.subheader("📦 Batch Output Mission Debrief")
+                
+                col_zip, col_local = st.columns(2)
+                
+                # OPTION A: ZIP ARCHIVE (Cloud Friendly)
+                with col_zip:
+                    st.markdown("### ☁️ Download All")
+                    st.info("Best for Cloud usage.")
+                    
+                    zip_base_name = os.path.join(TEMP_DIR, "captioned_videos")
+                    # Create zip (overwrite if exists)
+                    shutil.make_archive(zip_base_name, 'zip', OUTPUT_DIR)
+                    zip_file_path = zip_base_name + ".zip"
+                    
+                    with open(zip_file_path, "rb") as f:
+                        st.download_button(
+                            label="📦 Download ZIP Archive",
+                            data=f,
+                            file_name="captioned_videos.zip",
+                            mime="application/zip",
+                            type="primary",
+                            use_container_width=True
+                        )
+
+                # OPTION B: LOCAL SAVE (Local Friendly)
+                with col_local:
+                    st.markdown("### 💾 Local Save")
+                    st.info("Move files to a local folder.")
+                    
+                    default_path = st.session_state.saved_local_path
+                    local_dest = st.text_input("Destination Folder Path", value=default_path, placeholder="/Users/me/Movies/Captions")
+                    remember = st.checkbox("Remember path for this session", value=True)
+                    
+                    if st.button("📂 Move Files to Folder", use_container_width=True):
+                        if local_dest and os.path.exists(local_dest):
+                            try:
+                                files = os.listdir(OUTPUT_DIR)
+                                count = 0
+                                for f in files:
+                                    if f.endswith(".mp4"):
+                                        src = os.path.join(OUTPUT_DIR, f)
+                                        dst = os.path.join(local_dest, f)
+                                        shutil.copy2(src, dst) # Copy preserves metadata
+                                        count += 1
+                                
+                                st.success(f"Successfully moved {count} videos to `{local_dest}`")
+                                
+                                if remember:
+                                    st.session_state.saved_local_path = local_dest
+                            except Exception as e:
+                                st.error(f"Error moving files: {e}")
+                        else:
+                            st.error("❌ Invalid path or directory does not exist.")
+
+                st.divider()
+                if st.button("🔄 Start Over / Process New Batch"):
                     st.session_state.batch_index = 0
                     st.session_state.processing_started = False
+                    # Keep selected_batch or clear it? 
+                    # Usually better to keep selection so user can modify it.
                     st.rerun()
                 st.stop() # Stop rendering further UI
             
