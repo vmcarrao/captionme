@@ -189,7 +189,7 @@ def main():
         
         st.divider()
         st.markdown("**Instructions:**")
-        st.markdown("1. Select Video from Drive")
+        st.markdown("1. Upload Video (Drag & Drop)")
         st.markdown("2. Transcribe")
         st.markdown("3. Edit Subtitles")
         st.markdown("4. Render & Download")
@@ -211,296 +211,253 @@ def main():
     if "processing_started" not in st.session_state:
         st.session_state.processing_started = False
     
-    # --- Drive Integration ---
+    # --- Content Source (Drag & Drop) ---
     st.subheader("1. 📂 Content Source")
     
-    drive = DriveService()
-    if drive.service:
-        files = drive.list_files()
-        file_options = {f"{f['name']}": f for f in files}
+    uploaded_files = st.file_uploader(
+        "Drop Flight Data Recorders (Videos) Here", 
+        type=["mp4", "mov", "avi", "mkv"], 
+        accept_multiple_files=True
+    )
+    
+    if uploaded_files:
+        # Map filenames to file objects for easy access
+        file_map = {f.name: f for f in uploaded_files}
+        valid_options = list(file_map.keys())
         
-        # Ensure selected items are valid options (prevents errors on file deletion)
-        valid_options = list(file_options.keys())
-        st.session_state.selected_batch = [f for f in st.session_state.selected_batch if f in valid_options]
-        
-        # Checkbox List UI
-        st.write("SELECT FLIGHT DATA RECORDERS (VIDEOS):")
-        
-        # Container for the list
-        with st.container():
-            # "Select All" / "Deselect All" Buttons
-            col_actions, _ = st.columns([0.4, 0.6])
-            with col_actions:
-                 if st.button("Toggle All Selection"):
-                     # Determine if we should select all or deselect all based on current state
-                     if len(st.session_state.selected_batch) == len(valid_options):
-                         st.session_state.selected_batch = []
-                     else:
-                         st.session_state.selected_batch = valid_options
-                     st.rerun()
-
-            st.divider()
-            
-            # The List
-            new_selection = []
-            for filename in valid_options:
-                # check if currently selected
-                is_checked = filename in st.session_state.selected_batch
-                
-                # Render checkbox
-                # We use a unique key for each file
-                checked = st.checkbox(
-                    f"📄 {filename}", 
-                    value=is_checked,
-                    key=f"chk_{filename}"
-                )
-                
-                if checked:
-                    new_selection.append(filename)
-            
-            # Update the source of truth if changed
-            # Note: In Streamlit, checkboxes update on interaction immediately. 
-            # We just need to ensure selected_batch reflects the checkboxes next run.
-            # However, since we re-calculate `new_selection` every run based on widget values, 
-            # and widget values persist in session_state keys, we just assign it.
-            st.session_state.selected_batch = new_selection
-
-        if not st.session_state.selected_batch:
-            st.info("Awaiting selection of at least one target...")
-            st.session_state.processing_started = False # Reset if deselect all
-            
+        # Batch Selection Logic
+        # By default, select all uploaded files for processing
+        if "selected_batch" not in st.session_state or not st.session_state.selected_batch:
+             st.session_state.selected_batch = valid_options
         else:
-            # Manual Trigger Button
-            if not st.session_state.processing_started:
-                 st.write("---")
-                 if st.button("🚀 INITIATE TRANSCRIPTION SEQUENCE", type="primary"):
-                     st.session_state.processing_started = True
-                     st.rerun()
+             # Filter out files that might have been removed
+             st.session_state.selected_batch = [f for f in st.session_state.selected_batch if f in valid_options]
+             # If completely empty after filter (e.g. user cleared uploader), reset
+             if not st.session_state.selected_batch and valid_options:
+                 st.session_state.selected_batch = valid_options
 
-            if st.session_state.processing_started:
-                # --- UNIFIED INTERACTIVE QUEUE ---
-                # Determine Current File to Process
-                is_batch = len(st.session_state.selected_batch) > 1
-                if not is_batch:
-                    # Single File Mode
-                    current_filename = st.session_state.selected_batch[0]
-                    current_index = 0
-                    total_files = 1
-                else:
-                    # Batch Queue Mode
-                    current_index = st.session_state.batch_index
-                    total_files = len(st.session_state.selected_batch)
-                    
-                    # Check for completion
-                    if current_index >= total_files:
-                        st.success("🎉 All files in the batch have been processed!")
-                        st.balloons()
-                        if st.button("Start Over"):
-                            st.session_state.batch_index = 0
-                            st.rerun()
-                        st.stop() # Stop rendering further UI
-                    
-                    current_filename = st.session_state.selected_batch[current_index]
-                    st.markdown(f"### 🚀 Processing {current_index + 1}/{total_files}: {current_filename}")
-                    st.progress((current_index) / total_files)
+        # Display Selected Queue
+        st.write(f"**Queue:** {len(st.session_state.selected_batch)} videos ready.")
+        
+        # Manual Trigger Button
+        if not st.session_state.processing_started:
+             st.write("---")
+             if st.button("🚀 INITIATE TRANSCRIPTION SEQUENCE", type="primary"):
+                 st.session_state.processing_started = True
+                 st.rerun()
 
-                # Get File Info
-                file_info = file_options.get(current_filename)
-                if not file_info:
-                    st.error(f"File '{current_filename}' not found in current list.")
-                    st.stop()
+        if st.session_state.processing_started:
+            current_index = st.session_state.batch_index
+            total_files = len(st.session_state.selected_batch)
+            
+            # Check for completion
+            if current_index >= total_files:
+                st.success("🎉 All files in the batch have been processed!")
+                st.balloons()
+                if st.button("Start Over"):
+                    st.session_state.batch_index = 0
+                    st.session_state.processing_started = False
+                    st.rerun()
+                st.stop() # Stop rendering further UI
+            
+            current_filename = st.session_state.selected_batch[current_index]
+            is_batch = total_files > 1
+            
+            # Progress UI
+            if is_batch:
+                st.markdown(f"### 🚀 Processing {current_index + 1}/{total_files}: {current_filename}")
+                st.progress((current_index) / total_files)
+            else:
+                 st.markdown(f"### 🚀 Processing: {current_filename}")
 
-                # --- Auto-Load / Download Logic ---
-                # Check if we need to load this new file
-                is_new_file = (st.session_state.selected_file is None) or (st.session_state.selected_file.get('name') != current_filename)
+            # Get StreamlitUploadedFile
+            uploaded_file = file_map.get(current_filename)
+            if not uploaded_file:
+                st.error(f"File '{current_filename}' missing from upload state.")
+                st.stop()
+
+            # --- Auto-Load / Download Logic ---
+            # We need to save the BytesIO to a physical temp file for ffmpeg/processing
+            expected_temp_path = os.path.join(TEMP_DIR, current_filename)
+            
+            if st.session_state.local_video_path != expected_temp_path:
+                 with st.spinner(f"⬇️ Preparing {current_filename}..."):
+                     with open(expected_temp_path, "wb") as f:
+                         f.write(uploaded_file.getbuffer())
+                     
+                     st.session_state.local_video_path = expected_temp_path
+                     st.session_state.selected_file = {'name': current_filename}
+                     st.session_state.transcribed = False 
+                     
+                     # For Batch Mode, auto-transcribe
+                     if is_batch:
+                         st.session_state.auto_transcribe_trigger = True
+                 st.rerun()
+
+            # Display Video
+            if st.session_state.local_video_path:
+                st.video(st.session_state.local_video_path)
+
+                # --- Transcription ---
+                st.subheader("2. 📝 Transcription")
                 
-                if is_new_file:
-                     st.session_state.selected_file = file_info
-                     with st.spinner(f"⬇️ Downloading {current_filename}..."):
-                         local_path = drive.download_file(file_info['id'], file_info['name'], TEMP_DIR)
-                         st.session_state.local_video_path = local_path
-                         st.session_state.transcribed = False 
-                         # For Batch Mode, auto-transcribe immediately after download to save a click
-                         if is_batch:
-                             st.session_state.auto_transcribe_trigger = True
-                     st.rerun()
+                # Check for Auto-Transcribe Trigger
+                if st.session_state.get("auto_transcribe_trigger", False):
+                     st.session_state.auto_transcribe_trigger = False # Reset
+                     with st.spinner("🎙️ Auto-Transcribing for Batch Queue..."):
+                        try:
+                            transcriber = get_transcriber()
+                            results = transcriber.transcribe_video(st.session_state.local_video_path)
+                            st.session_state.subtitles = results
+                            st.session_state.transcribed = True
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error during transcription: {e}")
 
-                # Display Video
-                if st.session_state.local_video_path:
-                    st.video(st.session_state.local_video_path)
-
-                    # --- Transcription ---
-                    st.subheader("2. 📝 Transcription")
+                if not st.session_state.transcribed:
+                    if st.button("Start Transcription (faster-whisper)"):
+                        status_text = st.empty()
+                        status_text.text("⏳ Loading Whisper Model...")
+                        try:
+                            transcriber = get_transcriber()
+                            status_text.text("🎙️ Transcribing audio...")
+                            results = transcriber.transcribe_video(st.session_state.local_video_path)
+                            st.session_state.subtitles = results
+                            st.session_state.transcribed = True
+                            status_text.success("Transcription complete!")
+                            st.rerun()
+                        except Exception as e:
+                            status_text.error(f"Error during transcription: {e}")
+                
+                # --- Editing & Review ---
+                if st.session_state.transcribed:
+                    st.success("✅ Transcribed")
+                    st.subheader("3. ✏️ Review & Edit")
                     
-                    # Check for Auto-Transcribe Trigger
-                    if st.session_state.get("auto_transcribe_trigger", False):
-                         st.session_state.auto_transcribe_trigger = False # Reset
-                         with st.spinner("🎙️ Auto-Transcribing for Batch Queue..."):
-                            try:
-                                transcriber = get_transcriber()
-                                results = transcriber.transcribe_video(st.session_state.local_video_path)
-                                st.session_state.subtitles = results
-                                st.session_state.transcribed = True
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error during transcription: {e}")
-
-                    if not st.session_state.transcribed:
-                        if st.button("Start Transcription (faster-whisper)"):
-                            status_text = st.empty()
-                            status_text.text("⏳ Loading Whisper Model...")
-                            try:
-                                transcriber = get_transcriber()
-                                status_text.text("🎙️ Transcribing audio...")
-                                results = transcriber.transcribe_video(st.session_state.local_video_path)
-                                st.session_state.subtitles = results
-                                st.session_state.transcribed = True
-                                status_text.success("Transcription complete!")
-                                st.rerun()
-                            except Exception as e:
-                                status_text.error(f"Error during transcription: {e}")
+                    edited_data = st.data_editor(
+                        st.session_state.subtitles, 
+                        num_rows="dynamic",
+                        column_config={
+                            "words": None
+                        }
+                    )
                     
-                    # --- Editing & Review ---
-                    if st.session_state.transcribed:
-                        st.success("✅ Transcribed")
-                        st.subheader("3. ✏️ Review & Edit")
-                        
-                        edited_data = st.data_editor(
-                            st.session_state.subtitles, 
-                            num_rows="dynamic",
-                            column_config={
-                                "words": None
-                            }
-                        )
-                        
-                        # --- Rendering ---
-                        st.subheader("4. 🎨 Style & Render")
-                        selected_style = st.selectbox("Choose Caption Style", STYLES)
-                        
-                        # Style Customization
-                        with st.expander("✨ Customize Style (Font, Size, Color)"):
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT]
-                                font_mode = st.radio("Font Source", ["Presets", "Custom Google Font"], horizontal=True)
-                                
-                                final_font_path = FONT_BOLD # Default
-                                
-                                if font_mode == "Presets":
-                                    # Create readable labels for the paths
-                                    font_map = {
-                                        "Roboto Bold": FONT_BOLD,
-                                        "Roboto Regular": FONT_MINIMAL,
-                                        "Anton Impact": FONT_IMPACT
-                                    }
-                                    selected_label = st.selectbox("Choose Preset", list(font_map.keys()))
-                                    final_font_path = font_map[selected_label]
-                                else:
-                                    google_font_name = st.text_input("Enter Google Font Name (e.g. Lobster)", value="Lobster")
-                                    if st.button("Fetch Font"):
-                                        with st.spinner(f"Fetching {google_font_name}..."):
-                                            fetched_path = fetch_google_font(google_font_name)
-                                            if fetched_path:
-                                                st.success("Font downloaded!")
-                                                final_font_path = fetched_path
-                                                # Force reload to ensure next render uses it?
-                                                # Actually just setting the var is enough for the render button info
-                                                st.session_state.custom_font_path = fetched_path 
-                                            else:
-                                                st.error("Could not find font. Try checking the name on fonts.google.com")
-                                    
-                                    # Use cached custom path if available
-                                    if "custom_font_path" in st.session_state:
-                                        final_font_path = st.session_state.custom_font_path
-                                        st.caption(f"Using: {os.path.basename(final_font_path)}")
-
-                                cust_fontsize = st.number_input("Font Size", value=70, step=5)
-                                cust_stroke_width = st.number_input("Stroke Width", value=2, step=1)
-                            with col2:
-                                cust_color = st.color_picker("Text Color", "#FFFF00") # Yellow default
-                                cust_stroke_color = st.color_picker("Stroke/Outline Color", "#000000")
+                    # --- Rendering ---
+                    st.subheader("4. 🎨 Style & Render")
+                    selected_style = st.selectbox("Choose Caption Style", STYLES)
+                    
+                    # Style Customization
+                    with st.expander("✨ Customize Style (Font, Size, Color)"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT]
+                            font_mode = st.radio("Font Source", ["Presets", "Custom Google Font"], horizontal=True)
                             
-                            style_config = {
-                                "font": final_font_path,
-                                "fontsize": cust_fontsize,
-                                "color": cust_color,
-                                "stroke_color": cust_stroke_color,
-                                "stroke_width": cust_stroke_width
-                            }
+                            final_font_path = FONT_BOLD # Default
                             
-                            if st.button("🖼️ Preview Style"):
-                                 with st.spinner("Generating preview frame..."):
-                                     renderer = VideoRenderer()
-                                     preview_frame = renderer.generate_preview_frame(
-                                         st.session_state.local_video_path,
-                                         st.session_state.subtitles,
-                                         selected_style,
-                                         style_config
-                                     )
-                                     if preview_frame is not None:
-                                         st.image(preview_frame, caption=f"Preview: {selected_style}", width=200)
-                                     else:
-                                         st.error("Could not generate preview.")
-
-                        output_filename = f"captioned_{st.session_state.selected_file['name']}"
-                        output_path = os.path.join(OUTPUT_DIR, output_filename)
-                        
-                        # Actions
-                        col_b1, col_b2 = st.columns([1, 1])
-                        
-                        with col_b1:
-                            # Dynamic Button Label
-                            btn_label = "🔥 Render & Next Video ➡️" if is_batch else "🔥 Burn Captions"
-                            
-                            if st.button(btn_label, type="primary"):
-                                with st.spinner("Rendering video (MoviePy)..."):
-                                    renderer = VideoRenderer()
-                                    final_path = renderer.render_video(
-                                        st.session_state.local_video_path,
-                                        edited_data,
-                                        selected_style,
-                                        output_path,
-                                        style_config=style_config
-                                    )
-                                st.success(f"Rendering complete! Saved to {output_path}")
+                            if font_mode == "Presets":
+                                # Create readable labels for the paths
+                                font_map = {
+                                    "Roboto Bold": FONT_BOLD,
+                                    "Roboto Regular": FONT_MINIMAL,
+                                    "Anton Impact": FONT_IMPACT
+                                }
+                                selected_label = st.selectbox("Choose Preset", list(font_map.keys()))
+                                final_font_path = font_map[selected_label]
+                            else:
+                                google_font_name = st.text_input("Enter Google Font Name (e.g. Lobster)", value="Lobster")
+                                if st.button("Fetch Font"):
+                                    with st.spinner(f"Fetching {google_font_name}..."):
+                                        fetched_path = fetch_google_font(google_font_name)
+                                        if fetched_path:
+                                            st.success("Font downloaded!")
+                                            final_font_path = fetched_path
+                                            st.session_state.custom_font_path = fetched_path 
+                                        else:
+                                            st.error("Could not find font. Try checking the name on fonts.google.com")
                                 
-                                if is_batch:
-                                    # Advance Queue
-                                    st.session_state.batch_index += 1
-                                    st.rerun()
+                                # Use cached custom path if available
+                                if "custom_font_path" in st.session_state:
+                                    final_font_path = st.session_state.custom_font_path
+                                    st.caption(f"Using: {os.path.basename(final_font_path)}")
 
-                        with col_b2:
-                            if is_batch:
-                                 if st.button("Skip Video ⏭️"):
-                                     st.session_state.batch_index += 1
-                                     st.rerun()
+                            cust_fontsize = st.number_input("Font Size", value=70, step=5)
+                            cust_stroke_width = st.number_input("Stroke Width", value=2, step=1)
+                        with col2:
+                            cust_color = st.color_picker("Text Color", "#FFFF00") # Yellow default
+                            cust_stroke_color = st.color_picker("Stroke/Outline Color", "#000000")
                         
-                        # Download Link (Always available for current file)
-                        if os.path.exists(output_path):
-                             
-                             # Instructions for User
-                             st.info("ℹ️ **Download Note**: Click the button below to save the video to your device's default download folder.")
-                             
-                             with open(output_path, "rb") as f:
-                                st.download_button(
-                                    label="⬇️ DOWNLOAD VIDEO TO DEVICE",
-                                    data=f,
-                                    file_name=output_filename,
-                                    mime="video/mp4",
-                                    type="primary" 
+                        style_config = {
+                            "font": final_font_path,
+                            "fontsize": cust_fontsize,
+                            "color": cust_color,
+                            "stroke_color": cust_stroke_color,
+                            "stroke_width": cust_stroke_width
+                        }
+                        
+                        if st.button("🖼️ Preview Style"):
+                             with st.spinner("Generating preview frame..."):
+                                 renderer = VideoRenderer()
+                                 preview_frame = renderer.generate_preview_frame(
+                                     st.session_state.local_video_path,
+                                     st.session_state.subtitles,
+                                     selected_style,
+                                     style_config
+                                 )
+                                 if preview_frame is not None:
+                                     st.image(preview_frame, caption=f"Preview: {selected_style}", width=200)
+                                 else:
+                                     st.error("Could not generate preview.")
+
+                    output_filename = f"captioned_{st.session_state.selected_file['name']}"
+                    output_path = os.path.join(OUTPUT_DIR, output_filename)
+                    
+                    # Actions
+                    col_b1, col_b2 = st.columns([1, 1])
+                    
+                    with col_b1:
+                        # Dynamic Button Label
+                        btn_label = "🔥 Render & Next Video ➡️" if is_batch else "🔥 Burn Captions"
+                        
+                        if st.button(btn_label, type="primary"):
+                            with st.spinner("Rendering video (MoviePy)..."):
+                                renderer = VideoRenderer()
+                                final_path = renderer.render_video(
+                                    st.session_state.local_video_path,
+                                    edited_data,
+                                    selected_style,
+                                    output_path,
+                                    style_config=style_config
                                 )
+                            st.success(f"Rendering complete! Saved to {output_path}")
+                            
+                            if is_batch:
+                                # Advance Queue
+                                st.session_state.batch_index += 1
+                                st.rerun()
+
+                    with col_b2:
+                        if is_batch:
+                             if st.button("Skip Video ⏭️"):
+                                 st.session_state.batch_index += 1
+                                 st.rerun()
+                    
+                    # Download Link (Always available for current file)
+                    if os.path.exists(output_path):
+                         
+                         # Instructions for User
+                         st.info("ℹ️ **Download Note**: Click the button below to save the video to your device's default download folder.")
+                         
+                         with open(output_path, "rb") as f:
+                            st.download_button(
+                                label="⬇️ DOWNLOAD VIDEO TO DEVICE",
+                                data=f,
+                                file_name=output_filename,
+                                mime="video/mp4",
+                                type="primary" 
+                            )
     else:
-        st.error("⚠️ Google Drive Integration Failed")
-        st.warning("""
-        **Authentication Credentials Not Found**
-        
-        To run this app on Streamlit Cloud, you must configure secrets:
-        1. Go to your App Dashboard > **Settings** > **Secrets**.
-        2. Create a section `[google_drive]`.
-        3. Add your `token`, `client_id`, `client_secret`, etc.
-        
-        *If running locally, ensure `credentials.json` is in the root directory.*
-        """)
+        st.info("👋 Welcome to CaptionME. Drag & drop video files above to begin.")
 
 if __name__ == "__main__":
     main()
