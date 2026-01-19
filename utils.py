@@ -73,14 +73,25 @@ def download_google_fonts():
     os.makedirs(FONTS_DIR, exist_ok=True)
     
     created = 0
+    created = 0
     for filename, url in fonts.items():
         file_path = os.path.join(FONTS_DIR, filename)
+        
+        # Check if exists but is corrupt (too small)
+        if os.path.exists(file_path):
+            if os.path.getsize(file_path) < 1000:
+                print(f"Found corrupt font {filename}. Deleting...")
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+        
         if not os.path.exists(file_path):
             print(f"Downloading font: {filename}...")
             if download_file(url, file_path):
                 created += 1
         else:
-            pass
+             pass
             
     return created
 
