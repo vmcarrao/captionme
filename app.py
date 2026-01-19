@@ -56,20 +56,7 @@ def main():
             margin-bottom: 0px;
             letter-spacing: -2px;
         }
-        .brutalist-sub {
-            font-family: 'JetBrains Mono', monospace;
-            color: #ffffff;
-            font-size: 1.2rem;
-            border-top: 2px solid #FFD700;
-            border-bottom: 2px solid #FFD700;
-            padding: 10px 0;
-            margin-top: 10px;
-            margin-bottom: 40px;
-            display: flex;
-            justify-content: space-between;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+
         
         /* Sidebar styling */
         [data-testid="stSidebar"] {
@@ -125,15 +112,6 @@ def main():
     st.markdown("""
         <div style="text-align: center;">
             <div class="brutalist-header">CaptionME</div>
-            <div class="brutalist-sub">
-                <span>GEMINI 3 PRO</span>
-                <span>•</span>
-                <span>WHISPER AI</span>
-                <span>•</span>
-                <span>VERTICAL VIDEO</span>
-                <span>•</span>
-                <span>MISSION CONTROL</span>
-            </div>
         </div>
     """, unsafe_allow_html=True)
 
