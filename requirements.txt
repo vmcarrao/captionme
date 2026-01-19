@@ -1,7 +1,6 @@
 streamlit
 faster-whisper
 moviepy<2.0.0
-google-api-python-client
-google-auth-oauthlib
 pillow
 numpy<2.0.0
+
