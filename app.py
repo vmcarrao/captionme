@@ -381,6 +381,12 @@ def main():
 
 
                         col1, col2 = st.columns(2)
+                        
+                         # Karaoke Toggle (Global)
+                        chk_karaoke = st.checkbox("🎵 Karaoke Effect (Highlight Words)", key="chk_karaoke", help="Highlight words as they are spoken. You can customize the active color.")
+                        
+                        st.write("") # Spacer
+
                         with col1:
                             available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT]
                             
@@ -442,15 +448,24 @@ def main():
                             cust_fontsize = st.number_input("Font Size", value=70, step=5, key="cust_fontsize")
                             cust_stroke_width = st.number_input("Stroke Width", value=2, step=1, key="cust_stroke_width")
                         with col2:
-                            cust_color = st.color_picker("Text Color", "#FFFF00", key="cust_color") # Yellow default
+                            if chk_karaoke:
+                                st.markdown("**Karaoke Colors**")
+                                cust_color = st.color_picker("Active Word Color", "#FFFF00", key="cust_color", help="Color of the current spoken word")
+                                cust_inactive_color = st.color_picker("Base/Inactive Color", "#FFFFFF", key="cust_inactive_color", help="Color of other words")
+                            else:
+                                cust_color = st.color_picker("Text Color", "#FFFF00", key="cust_color") # Yellow default
+                                cust_inactive_color = "#FFFFFF" # Unused for others
+                                
                             cust_stroke_color = st.color_picker("Stroke/Outline Color", "#000000", key="cust_stroke_color")
                         
                         style_config = {
                             "font": final_font_path,
                             "fontsize": cust_fontsize,
                             "color": cust_color,
+                            "inactive_color": cust_inactive_color,
                             "stroke_color": cust_stroke_color,
-                            "stroke_width": cust_stroke_width
+                            "stroke_width": cust_stroke_width,
+                            "karaoke": chk_karaoke
                         }
                         
                         st.markdown("---")
@@ -478,6 +493,10 @@ def main():
                                      st.session_state.cust_stroke_width = data.get("stroke_width", 2)
                                      st.session_state.cust_color = data.get("color", "#FFFF00")
                                      st.session_state.cust_stroke_color = data.get("stroke_color", "#000000")
+                                     st.session_state.chk_karaoke = data.get("karaoke", False)
+                                     # Restore inactive color if present
+                                     if "inactive_color" in data:
+                                          st.session_state.cust_inactive_color = data.get("inactive_color")
                                      
                                      # We can't show st.success in a callback easily as it might be cleared
                                      # But we can set a flag if needed, or just rely on the UI update.
@@ -518,7 +537,9 @@ def main():
                                         "fontsize": cust_fontsize,
                                         "stroke_width": cust_stroke_width,
                                         "color": cust_color,
-                                        "stroke_color": cust_stroke_color
+                                        "inactive_color": cust_inactive_color,
+                                        "stroke_color": cust_stroke_color,
+                                        "karaoke": chk_karaoke
                                     }
                                     presets_mgr.save_preset(new_preset_name, config_to_save)
                                     st.success(f"Saved: {new_preset_name}")
@@ -549,23 +570,27 @@ def main():
                     st.divider()
                     
                     # --- ACTION AREA ---
-                    if not is_rendered:
-                        # STEP 1: RENDER
-                        if st.button("🔥 Render Video", type="primary", use_container_width=True):
-                            with st.spinner("Rendering video (MoviePy)..."):
-                                renderer = VideoRenderer()
-                                final_path = renderer.render_video(
-                                    st.session_state.local_video_path,
-                                    edited_data,
-                                    selected_style,
-                                    output_path,
-                                    style_config=style_config
-                                )
-                            st.success(f"Rendering complete! Saved to {output_path}")
-                            st.rerun()
-                            
-                    else:
-                        # STEP 2: POST-RENDER ACTIONS (Save & Next)
+                    st.divider()
+                    
+                    # --- ACTION AREA ---
+                    
+                    # STEP 1: ALWAYS SHOW BURN BUTTON
+                    if st.button("🔥 Burn Captions", type="primary", use_container_width=True):
+                         with st.spinner("Rendering video (MoviePy)..."):
+                             renderer = VideoRenderer()
+                             final_path = renderer.render_video(
+                                 st.session_state.local_video_path,
+                                 edited_data,
+                                 selected_style,
+                                 output_path,
+                                 style_config=style_config
+                             )
+                         st.success(f"Rendering complete! Saved to {output_path}")
+                         # Force re-check of file existence by updating state or just rerun
+                         st.rerun()
+
+                    # STEP 2: POST-RENDER ACTIONS (If file exists)
+                    if is_rendered:
                         st.success(f"✅ Render Complete: {output_filename}")
                         
                         col_actions_1, col_actions_2 = st.columns(2)
