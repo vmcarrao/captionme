@@ -8,6 +8,7 @@ from settings import (
 )
 from transcriber import Transcriber
 from renderer import VideoRenderer
+from presets_manager import PresetsManager
 
 # --- App Config ---
 st.set_page_config(page_title="CaptionME", page_icon="🎬", layout="wide")
@@ -374,11 +375,22 @@ def main():
                     selected_style = st.selectbox("Choose Caption Style", STYLES)
                     
                     # Style Customization
+                    # Style Customization
                     with st.expander("✨ Customize Style (Font, Size, Color)"):
+                        presets_mgr = PresetsManager()
+
+
                         col1, col2 = st.columns(2)
                         with col1:
                             available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT]
-                            font_mode = st.radio("Font Source", ["Presets", "Custom Google Font"], horizontal=True)
+                            
+                            # Keys added for state management
+                            font_mode = st.radio(
+                                "Font Source", 
+                                ["Presets", "Custom Google Font"], 
+                                horizontal=True,
+                                key="font_source_mode"
+                            )
                             
                             final_font_path = FONT_BOLD # Default
                             
@@ -389,10 +401,29 @@ def main():
                                     "Roboto Regular": FONT_MINIMAL,
                                     "Anton Impact": FONT_IMPACT
                                 }
-                                selected_label = st.selectbox("Choose Preset", list(font_map.keys()))
+                                # Reverse map for saving
+                                path_to_label = {v: k for k, v in font_map.items()}
+                                
+                                # Identify current index based on state if possible, else default
+                                # But st.selectbox with key handles 'value' automatically if in state?
+                                # No, key acts as the source of truth.
+                                
+                                selected_label = st.selectbox(
+                                    "Choose Preset", 
+                                    list(font_map.keys()),
+                                    key="preset_font_choice"
+                                )
                                 final_font_path = font_map[selected_label]
+                                current_font_selection = selected_label # for saving
+                                
                             else:
-                                google_font_name = st.text_input("Enter Google Font Name (e.g. Lobster)", value="Lobster")
+                                google_font_name = st.text_input(
+                                    "Enter Google Font Name (e.g. Lobster)", 
+                                    value="Lobster",
+                                    key="google_font_name_input"
+                                )
+                                current_font_selection = google_font_name # for saving
+
                                 if st.button("Fetch Font"):
                                     with st.spinner(f"Fetching {google_font_name}..."):
                                         fetched_path = fetch_google_font(google_font_name)
@@ -408,11 +439,11 @@ def main():
                                     final_font_path = st.session_state.custom_font_path
                                     st.caption(f"Using: {os.path.basename(final_font_path)}")
 
-                            cust_fontsize = st.number_input("Font Size", value=70, step=5)
-                            cust_stroke_width = st.number_input("Stroke Width", value=2, step=1)
+                            cust_fontsize = st.number_input("Font Size", value=70, step=5, key="cust_fontsize")
+                            cust_stroke_width = st.number_input("Stroke Width", value=2, step=1, key="cust_stroke_width")
                         with col2:
-                            cust_color = st.color_picker("Text Color", "#FFFF00") # Yellow default
-                            cust_stroke_color = st.color_picker("Stroke/Outline Color", "#000000")
+                            cust_color = st.color_picker("Text Color", "#FFFF00", key="cust_color") # Yellow default
+                            cust_stroke_color = st.color_picker("Stroke/Outline Color", "#000000", key="cust_stroke_color")
                         
                         style_config = {
                             "font": final_font_path,
@@ -421,6 +452,81 @@ def main():
                             "stroke_color": cust_stroke_color,
                             "stroke_width": cust_stroke_width
                         }
+                        
+                        st.markdown("---")
+
+                        # --- PRESET MANAGER (Load & Save) ---
+                        st.write("#### 💾 Presets Manager")
+                        
+                        # --- Callback for Loading Presets ---
+                        def load_preset_callback():
+                             selected_loader = st.session_state.get("preset_loader")
+                             if selected_loader and selected_loader != "None":
+                                 mgr = PresetsManager()
+                                 data = mgr.get_preset(selected_loader)
+                                 if data:
+                                     # Update Session State directly
+                                     # This runs BEFORE the script re-runs, so widgets will pick up new values
+                                     st.session_state.font_source_mode = data.get("font_mode", "Presets")
+                                     
+                                     if data.get("font_mode") == "Presets":
+                                         st.session_state.preset_font_choice = data.get("font_selection")
+                                     else:
+                                         st.session_state.google_font_name_input = data.get("font_selection")
+                                         
+                                     st.session_state.cust_fontsize = data.get("fontsize", 70)
+                                     st.session_state.cust_stroke_width = data.get("stroke_width", 2)
+                                     st.session_state.cust_color = data.get("color", "#FFFF00")
+                                     st.session_state.cust_stroke_color = data.get("stroke_color", "#000000")
+                                     
+                                     # We can't show st.success in a callback easily as it might be cleared
+                                     # But we can set a flag if needed, or just rely on the UI update.
+                                     st.session_state.preset_loaded_msg = f"Loaded '{selected_loader}'"
+
+                        # 1. LOADER
+                        all_presets = presets_mgr.get_all_names()
+                        preset_options = ["None"] + all_presets
+                        
+                        col_p1, col_p2 = st.columns([3, 1])
+                        with col_p1:
+                            selected_preset_load = st.selectbox("📂 Load Saved Preset", preset_options, key="preset_loader")
+                        with col_p2:
+                            st.write("") # Spacing
+                            st.write("") 
+                            # Use callback to avoid "modifying state after widget instantiation" error
+                            st.button("Load Preset", on_click=load_preset_callback)
+                        
+                        # Show success message if set by callback
+                        if "preset_loaded_msg" in st.session_state:
+                            st.success(st.session_state.preset_loaded_msg)
+                            del st.session_state.preset_loaded_msg
+
+                        # 2. SAVER
+                        col_s1, col_s2 = st.columns([3, 1])
+                        with col_s1:
+                            new_preset_name = st.text_input("New Preset Name", placeholder="My Custom Style")
+                        with col_s2:
+                            st.write("")
+                            st.write("") 
+                            if st.button("Save Preset"):
+                                if new_preset_name:
+                                    config_to_save = {
+                                        # Use session state to be safe, or local vars if valid
+                                        # Local variables are valid here because we are in the same scope
+                                        "font_mode": font_mode,
+                                        "font_selection": current_font_selection,
+                                        "fontsize": cust_fontsize,
+                                        "stroke_width": cust_stroke_width,
+                                        "color": cust_color,
+                                        "stroke_color": cust_stroke_color
+                                    }
+                                    presets_mgr.save_preset(new_preset_name, config_to_save)
+                                    st.success(f"Saved: {new_preset_name}")
+                                    st.rerun()
+                                else:
+                                    st.warning("Enter a name.")
+
+                        st.markdown("---")
                         
                         if st.button("🖼️ Preview Style"):
                              with st.spinner("Generating preview frame..."):
