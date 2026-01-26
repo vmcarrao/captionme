@@ -15,6 +15,37 @@ class VideoRenderer:
     def __init__(self):
         pass
 
+    def _wrap_text_pixel(self, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> str:
+        """Helper to wrap text based on pixel width."""
+        words = text.split()
+        if not words:
+            return ""
+            
+        dummy_draw = ImageDraw.Draw(Image.new('RGBA', (1, 1)))
+        lines = []
+        current_line = []
+        
+        for word in words:
+            # Check width of (current_line + word)
+            test_line = " ".join(current_line + [word])
+            w = dummy_draw.textlength(test_line, font=font)
+            
+            if w <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    current_line = [word]
+                else:
+                    # Word itself is too long, just add it
+                    lines.append(word)
+                    current_line = []
+        
+        if current_line:
+            lines.append(" ".join(current_line))
+            
+        return "\n".join(lines)
+
     def _create_pil_text_image(self, text, font_path, fontsize, color, stroke_color=None, stroke_width=0, size=None):
         """
         Creates a numpy array image of text using PIL.
@@ -117,8 +148,18 @@ class VideoRenderer:
         for sub in subtitles:
             text_content = str(sub.get('text', '') or "")
             try:
+                # Load font for measuring
+                try:
+                    font = ImageFont.truetype(font_path, int(fontsize))
+                except:
+                    font = ImageFont.load_default()
+
+                # Wrap text
+                max_width = int(w * 0.9)
+                wrapped_text = self._wrap_text_pixel(text_content, font, max_width)
+
                 img_array = self._create_pil_text_image(
-                    text_content, font_path, fontsize, color, stroke_color, stroke_width
+                    wrapped_text, font_path, fontsize, color, stroke_color, stroke_width
                 )
                 
                 txt_clip = (ImageClip(img_array)
@@ -149,8 +190,17 @@ class VideoRenderer:
         for sub in subtitles:
             text_content = str(sub.get('text', '') or "")
             try:
+                # Load font for measuring
+                try:
+                    font = ImageFont.truetype(font_path, int(fontsize))
+                except:
+                    font = ImageFont.load_default()
+                
+                max_width = int(w * 0.9)
+                wrapped_text = self._wrap_text_pixel(text_content, font, max_width)
+
                 img_array = self._create_pil_text_image(
-                    text_content, font_path, fontsize, color, stroke_width=0
+                    wrapped_text, font_path, fontsize, color, stroke_width=0
                 )
                 
                 txt_clip = (ImageClip(img_array)
@@ -202,8 +252,17 @@ class VideoRenderer:
                 # Fallback to full text
                 text_content = str(sub.get('text', '') or "")
                 try:
+                    # Load font for measuring
+                    try:
+                        font = ImageFont.truetype(font_path, int(fontsize*0.8))
+                    except:
+                        font = ImageFont.load_default()
+
+                    max_width = int(w * 0.9)
+                    wrapped_text = self._wrap_text_pixel(text_content, font, max_width)
+
                     img_array = self._create_pil_text_image(
-                        text_content, font_path, int(fontsize*0.8), color, stroke_color, stroke_width
+                        wrapped_text, font_path, int(fontsize*0.8), color, stroke_color, stroke_width
                     )
                     txt_clip = (ImageClip(img_array)
                                 .set_duration(sub['end'] - sub['start'])
@@ -277,7 +336,16 @@ class VideoRenderer:
             if not words:
                  text_content = str(sub.get('text', '') or "")
                  try:
-                     img_array = self._create_pil_text_image(text_content, font_path, fontsize, active_color, stroke_color, stroke_width)
+                     # Load font
+                     try:
+                         font = ImageFont.truetype(font_path, int(fontsize))
+                     except:
+                         font = ImageFont.load_default()
+                     
+                     max_width = int(w * 0.9)
+                     wrapped_text = self._wrap_text_pixel(text_content, font, max_width)
+
+                     img_array = self._create_pil_text_image(wrapped_text, font_path, fontsize, active_color, stroke_color, stroke_width)
                      txt_clip = (ImageClip(img_array)
                                  .set_duration(sub['end'] - sub['start'])
                                  .set_start(sub['start'])
@@ -310,9 +378,11 @@ class VideoRenderer:
                 end = word_info['end']
 
                 try:
+                    max_width = int(w * 0.9)
                     img_array = self._create_karaoke_pil_image(
                         words, i, font_path, fontsize, 
-                        active_color, inactive_color, stroke_color, stroke_width
+                        active_color, inactive_color, stroke_color, stroke_width,
+                        max_width=max_width
                     )
                     
                     pos = ('center', 0.7*h)
@@ -347,7 +417,8 @@ class VideoRenderer:
                             if gap_dur > 0.1:
                                 gap_img = self._create_karaoke_pil_image(
                                     words, -1, font_path, fontsize,
-                                    active_color, inactive_color, stroke_color, stroke_width
+                                    active_color, inactive_color, stroke_color, stroke_width,
+                                    max_width=max_width
                                 )
                                 
                                 gap_pos = ('center', 0.7*h)
@@ -371,8 +442,8 @@ class VideoRenderer:
         
         return clips
 
-    def _create_karaoke_pil_image(self, words_data, active_idx, font_path, fontsize, active_color, inactive_color, stroke_color, stroke_width):
-        """Draws the entire sentence, but highlights words_data[active_idx]."""
+    def _create_karaoke_pil_image(self, words_data, active_idx, font_path, fontsize, active_color, inactive_color, stroke_color, stroke_width, max_width=None):
+        """Draws the entire sentence with word-level highlighting, supporting multi-line wrapping."""
         fontsize = int(fontsize)
         
         try:
@@ -380,60 +451,104 @@ class VideoRenderer:
         except:
              font = ImageFont.load_default()
         
-        # 1. Calculate dimensions
         dummy_draw = ImageDraw.Draw(Image.new('RGBA', (1, 1)))
         
-        total_width = 0
-        max_height = 0
-        spac_width = dummy_draw.textlength(" ", font=font)
-        
-        word_metrics = [] # (text, width, height)
-        
-        for w in words_data:
-            txt = w['word']
-            # bbox: left, top, right, bottom
-            bbox = dummy_draw.textbbox((0, 0), txt, font=font, stroke_width=stroke_width)
-            w_width = bbox[2] - bbox[0]
-            w_height = bbox[3] - bbox[1]
+        # 1. Metrics & Layout Engine
+        try:
+            ascent, descent = font.getmetrics()
+        except:
+            ascent, descent = fontsize, fontsize * 0.2 # Fallback
             
-            word_metrics.append({
-                "text": txt,
-                "width": w_width, 
-                "height": w_height
-            })
-            
-            total_width += w_width + spac_width
-            max_height = max(max_height, w_height)
-            
-        total_width -= spac_width # Remove last space
+        line_height = ascent + descent
+        space_width = dummy_draw.textlength(" ", font=font)
         
-        # Add padding
-        W = int(total_width + 40)
-        H = int(max_height + stroke_width*2 + 40)
+        lines = [] 
+        current_line = []
+        current_line_width = 0
+        
+        # Calculate word details using TYPOGRAPHIC width
+        processed_words = []
+        for w_obj in words_data:
+            txt = w_obj['word']
+            w_width = dummy_draw.textlength(txt, font=font)
+            processed_words.append({"text": txt, "width": w_width, "obj": w_obj})
+        
+        max_total_width = 0
+        
+        for i, pwm in enumerate(processed_words):
+            # Advance logic: current_line_width + (space if not start) + word_width
+            word_w = pwm['width']
+            space = space_width if current_line else 0
+            new_width = current_line_width + space + word_w
+            
+            if max_width and new_width > max_width and current_line:
+                # Wrap
+                lines.append({"words": current_line, "width": current_line_width})
+                max_total_width = max(max_total_width, current_line_width)
+                
+                # Start new line
+                current_line = [i]
+                current_line_width = word_w
+            else:
+                current_line.append(i)
+                current_line_width = new_width
+                
+        if current_line:
+            lines.append({"words": current_line, "width": current_line_width})
+            max_total_width = max(max_total_width, current_line_width)
+            
+        # 2. Draw
+        if max_total_width == 0: max_total_width = 1 # avoid zero size
+        
+        # Spacing line-to-line
+        vertical_spacing = line_height * 0.2
+        total_content_height = len(lines) * line_height + (len(lines) - 1) * vertical_spacing
+        
+        # Canvas Size with padding
+        # Add stroke buffer. Since we anchor 'la', we need room above ascent.
+        # Actually standard PIL drawing needs room around.
+        padding_x = 40 + stroke_width * 2
+        padding_y = 40 + stroke_width * 2
+        
+        W = int(max_total_width + padding_x)
+        H = int(total_content_height + padding_y)
         
         img = Image.new('RGBA', (W, H), (0,0,0,0))
         draw = ImageDraw.Draw(img)
         
-        # 2. Draw words
-        current_x = 20 # Padding left
-        y_pos = H / 2
+        start_y = 20 + stroke_width # Top padding
         
-        for i, wm in enumerate(word_metrics):
-            is_active = (i == active_idx)
-            fill_c = active_color if is_active else inactive_color
+        for line_info in lines:
+            line_w = line_info['width']
+            # Center horizontally
+            current_x = (W - line_w) / 2
             
-            # Using anchor='lm' (left-middle) for sequence
-            draw.text(
-                (current_x, y_pos), 
-                wm['text'], 
-                font=font, 
-                fill=fill_c, 
-                anchor='lm', 
-                stroke_width=stroke_width, 
-                stroke_fill=stroke_color
-            )
+            # Baseline is start_y + ascent using anchor='ls' or 'la'
+            # 'la' (Left Ascender) draws text so that the top of ascender is at y.
+            # 'ls' (Left Baseline) draws text so that baseline is at y.
+            # Let's use 'as' (Ascender height) or just manually calc baseline?
+            # Easiest for consistent alignment across words is anchor 'la' (Left Ascender) at same Y.
+            # Then all words top-align to the ascender line.
             
-            current_x += wm['width'] + spac_width
+            for word_idx in line_info['words']:
+                pwm = processed_words[word_idx]
+                
+                is_active = (word_idx == active_idx)
+                fill_c = active_color if is_active else inactive_color
+                
+                draw.text(
+                    (current_x, start_y),
+                    pwm['text'],
+                    font=font,
+                    fill=fill_c,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_color,
+                    anchor='la' # Left Ascender alignment
+                )
+                
+                current_x += pwm['width'] + space_width
+                
+            start_y += line_height + vertical_spacing
             
         return np.array(img)
 
