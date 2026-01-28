@@ -380,84 +380,84 @@ def main():
                         presets_mgr = PresetsManager()
 
 
-                        col1, col2 = st.columns(2)
+                        # Layout: 3 Columns (Font Settings | Color Settings | Live Preview)
+                        col_font, col_color, col_preview = st.columns([1.5, 1, 1.5]) # Adjusted ratios for better fit
                         
-                         # Karaoke Toggle (Global)
-                        chk_karaoke = st.checkbox("🎵 Karaoke Effect (Highlight Words)", key="chk_karaoke", help="Highlight words as they are spoken. You can customize the active color.")
+                        # --- COLUMN 1: FONT SETTINGS ---
+                        with col_font:
+                             available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT]
+                             
+                             # Font Source
+                             font_mode = st.radio(
+                                 "Font Source", 
+                                 ["Presets", "Custom Google Font"], 
+                                 horizontal=True,
+                                 key="font_source_mode"
+                             )
+                             
+                             final_font_path = FONT_BOLD # Default
+                             
+                             if font_mode == "Presets":
+                                 font_map = {
+                                     "Roboto Bold": FONT_BOLD,
+                                     "Roboto Regular": FONT_MINIMAL,
+                                     "Anton Impact": FONT_IMPACT
+                                 }
+                                 current_font_selection = st.selectbox(
+                                     "Choose Preset", 
+                                     list(font_map.keys()),
+                                     key="preset_font_choice"
+                                 )
+                                 final_font_path = font_map[current_font_selection]
+                                 
+                             else:
+                                 google_font_name = st.text_input(
+                                     "Enter Google Font Name", 
+                                     value="Lobster",
+                                     key="google_font_name_input"
+                                 )
+                                 current_font_selection = google_font_name 
+
+                                 if st.button("Fetch Font"):
+                                     with st.spinner(f"Fetching {google_font_name}..."):
+                                         fetched_path = fetch_google_font(google_font_name)
+                                         if fetched_path:
+                                             st.success("Font downloaded!")
+                                             final_font_path = fetched_path
+                                             st.session_state.custom_font_path = fetched_path 
+                                         else:
+                                             st.error("Not found.")
+                                 
+                                 if "custom_font_path" in st.session_state:
+                                     final_font_path = st.session_state.custom_font_path
+                                     st.caption(f"Using: {os.path.basename(final_font_path)}")
+
+                             cust_fontsize = st.number_input("Font Size", value=70, step=5, key="cust_fontsize")
+                             cust_stroke_width = st.number_input("Stroke Width", value=2, step=1, key="cust_stroke_width")
+                             
+                             col_spacing_1, col_spacing_2 = st.columns(2)
+                             with col_spacing_1:
+                                 cust_letter_spacing = st.number_input("Letter Spacing", value=0, step=1, key="cust_letter_spacing")
+                             with col_spacing_2:
+                                 cust_line_spacing = st.number_input("Line Spacing", value=0, step=5, key="cust_line_spacing")
+                             
+                             st.write("")
+                             chk_karaoke = st.checkbox("🎵 Karaoke Effect", key="chk_karaoke", help="Highlight words as they are spoken.")
+
+                        # --- COLUMN 2: COLOR SETTINGS ---
+                        with col_color:
+                             if chk_karaoke:
+                                 st.markdown("**Karaoke Colors**")
+                                 cust_color = st.color_picker("Active Word", "#FFFF00", key="cust_color")
+                                 cust_inactive_color = st.color_picker("Inactive Word", "#FFFFFF", key="cust_inactive_color")
+                             else:
+                                 st.markdown("**Text Colors**")
+                                 cust_color = st.color_picker("Text Color", "#FFFF00", key="cust_color")
+                                 cust_inactive_color = "#FFFFFF" 
+                                 
+                             cust_stroke_color = st.color_picker("Stroke Color", "#000000", key="cust_stroke_color")
                         
-                        st.write("") # Spacer
-
-                        with col1:
-                            available_fonts = [FONT_BOLD, FONT_MINIMAL, FONT_IMPACT]
-                            
-                            # Keys added for state management
-                            font_mode = st.radio(
-                                "Font Source", 
-                                ["Presets", "Custom Google Font"], 
-                                horizontal=True,
-                                key="font_source_mode"
-                            )
-                            
-                            final_font_path = FONT_BOLD # Default
-                            
-                            if font_mode == "Presets":
-                                # Create readable labels for the paths
-                                font_map = {
-                                    "Roboto Bold": FONT_BOLD,
-                                    "Roboto Regular": FONT_MINIMAL,
-                                    "Anton Impact": FONT_IMPACT
-                                }
-                                # Reverse map for saving
-                                path_to_label = {v: k for k, v in font_map.items()}
-                                
-                                # Identify current index based on state if possible, else default
-                                # But st.selectbox with key handles 'value' automatically if in state?
-                                # No, key acts as the source of truth.
-                                
-                                selected_label = st.selectbox(
-                                    "Choose Preset", 
-                                    list(font_map.keys()),
-                                    key="preset_font_choice"
-                                )
-                                final_font_path = font_map[selected_label]
-                                current_font_selection = selected_label # for saving
-                                
-                            else:
-                                google_font_name = st.text_input(
-                                    "Enter Google Font Name (e.g. Lobster)", 
-                                    value="Lobster",
-                                    key="google_font_name_input"
-                                )
-                                current_font_selection = google_font_name # for saving
-
-                                if st.button("Fetch Font"):
-                                    with st.spinner(f"Fetching {google_font_name}..."):
-                                        fetched_path = fetch_google_font(google_font_name)
-                                        if fetched_path:
-                                            st.success("Font downloaded!")
-                                            final_font_path = fetched_path
-                                            st.session_state.custom_font_path = fetched_path 
-                                        else:
-                                            st.error("Could not find font. Try checking the name on fonts.google.com")
-                                
-                                # Use cached custom path if available
-                                if "custom_font_path" in st.session_state:
-                                    final_font_path = st.session_state.custom_font_path
-                                    st.caption(f"Using: {os.path.basename(final_font_path)}")
-
-                            cust_fontsize = st.number_input("Font Size", value=70, step=5, key="cust_fontsize")
-                            cust_stroke_width = st.number_input("Stroke Width", value=2, step=1, key="cust_stroke_width")
-                        with col2:
-                            if chk_karaoke:
-                                st.markdown("**Karaoke Colors**")
-                                cust_color = st.color_picker("Active Word Color", "#FFFF00", key="cust_color", help="Color of the current spoken word")
-                                cust_inactive_color = st.color_picker("Base/Inactive Color", "#FFFFFF", key="cust_inactive_color", help="Color of other words")
-                            else:
-                                cust_color = st.color_picker("Text Color", "#FFFF00", key="cust_color") # Yellow default
-                                cust_inactive_color = "#FFFFFF" # Unused for others
-                                
-                            cust_stroke_color = st.color_picker("Stroke/Outline Color", "#000000", key="cust_stroke_color")
-                        
+                        # Prepare Config for Preview
                         style_config = {
                             "font": final_font_path,
                             "fontsize": cust_fontsize,
@@ -465,9 +465,35 @@ def main():
                             "inactive_color": cust_inactive_color,
                             "stroke_color": cust_stroke_color,
                             "stroke_width": cust_stroke_width,
-                            "karaoke": chk_karaoke
+                            "karaoke": chk_karaoke,
+                            "letter_spacing": cust_letter_spacing,
+                            "line_spacing": cust_line_spacing
                         }
-                        
+
+                        # --- COLUMN 3: LIVE PREVIEW ---
+                        with col_preview:
+                             st.markdown("**Live Preview**")
+                             if st.session_state.local_video_path and st.session_state.subtitles:
+                                  # Container to keep height stable?
+                                  preview_container = st.container()
+                                  try:
+                                      renderer = VideoRenderer()
+                                      # We generate preview for the CURRENT config
+                                      preview_frame = renderer.generate_preview_frame(
+                                          st.session_state.local_video_path,
+                                          st.session_state.subtitles,
+                                          selected_style,
+                                          style_config
+                                      )
+                                      if preview_frame is not None:
+                                          preview_container.image(preview_frame, width=350)
+                                      else:
+                                          preview_container.error("Preview failed.")
+                                  except Exception as e:
+                                      preview_container.error(f"Error: {e}")
+                             else:
+                                  st.info("Load video to see preview.")
+
                         st.markdown("---")
 
                         # --- PRESET MANAGER (Load & Save) ---
@@ -481,7 +507,6 @@ def main():
                                  data = mgr.get_preset(selected_loader)
                                  if data:
                                      # Update Session State directly
-                                     # This runs BEFORE the script re-runs, so widgets will pick up new values
                                      st.session_state.font_source_mode = data.get("font_mode", "Presets")
                                      
                                      if data.get("font_mode") == "Presets":
@@ -494,12 +519,9 @@ def main():
                                      st.session_state.cust_color = data.get("color", "#FFFF00")
                                      st.session_state.cust_stroke_color = data.get("stroke_color", "#000000")
                                      st.session_state.chk_karaoke = data.get("karaoke", False)
-                                     # Restore inactive color if present
                                      if "inactive_color" in data:
                                           st.session_state.cust_inactive_color = data.get("inactive_color")
                                      
-                                     # We can't show st.success in a callback easily as it might be cleared
-                                     # But we can set a flag if needed, or just rely on the UI update.
                                      st.session_state.preset_loaded_msg = f"Loaded '{selected_loader}'"
 
                         # 1. LOADER
@@ -510,12 +532,10 @@ def main():
                         with col_p1:
                             selected_preset_load = st.selectbox("📂 Load Saved Preset", preset_options, key="preset_loader")
                         with col_p2:
-                            st.write("") # Spacing
                             st.write("") 
-                            # Use callback to avoid "modifying state after widget instantiation" error
+                            st.write("") 
                             st.button("Load Preset", on_click=load_preset_callback)
                         
-                        # Show success message if set by callback
                         if "preset_loaded_msg" in st.session_state:
                             st.success(st.session_state.preset_loaded_msg)
                             del st.session_state.preset_loaded_msg
@@ -530,8 +550,6 @@ def main():
                             if st.button("Save Preset"):
                                 if new_preset_name:
                                     config_to_save = {
-                                        # Use session state to be safe, or local vars if valid
-                                        # Local variables are valid here because we are in the same scope
                                         "font_mode": font_mode,
                                         "font_selection": current_font_selection,
                                         "fontsize": cust_fontsize,
@@ -546,22 +564,6 @@ def main():
                                     st.rerun()
                                 else:
                                     st.warning("Enter a name.")
-
-                        st.markdown("---")
-                        
-                        if st.button("🖼️ Preview Style"):
-                             with st.spinner("Generating preview frame..."):
-                                 renderer = VideoRenderer()
-                                 preview_frame = renderer.generate_preview_frame(
-                                     st.session_state.local_video_path,
-                                     st.session_state.subtitles,
-                                     selected_style,
-                                     style_config
-                                 )
-                                 if preview_frame is not None:
-                                     st.image(preview_frame, caption=f"Preview: {selected_style}", width=200)
-                                 else:
-                                     st.error("Could not generate preview.")
 
                     output_filename = f"captioned_{st.session_state.selected_file['name']}"
                     output_path = os.path.join(OUTPUT_DIR, output_filename)
